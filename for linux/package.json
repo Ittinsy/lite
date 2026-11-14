@@ -1,0 +1,27 @@
+{
+  "name": "lite",
+  "version": "1.0.0",
+  "description": "Containers",
+  "author": "lite",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --linux AppImage",
+    "dist:dir": "electron-builder --linux dir"
+  },
+  "dependencies": {
+    "element-plus": "^2.9.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "electron": "^45.3.1",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "com.example.lite",
+    "productName": "lite",
+    "files": ["main.js", "preload.js", "index.html"],
+    "linux": { "target": "AppImage", "category": "Utility" },
+    "appImage": { "artifactName": "lite.AppImage" }
+  }
+}

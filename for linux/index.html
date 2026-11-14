@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Containers</title>
+  <link rel="stylesheet" href="./node_modules/element-plus/dist/index.css" />
+  <style>
+    body { margin: 0; padding: 16px; font-family: "Segoe UI", system-ui, sans-serif; }
+    .el-dialog__body { max-height: 70vh; overflow: auto; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <el-alert v-if="!kernel" type="error" :closable="false" style="margin-bottom:12px"
+    title="Kernel not found. Extract fingerprint-chromium into the kernel folder next to the program, with the chrome executable directly inside it."></el-alert>
+  <el-button type="primary" @click="openCreate">Create</el-button>
+
+  <el-table :data="envs" style="margin-top:12px">
+    <el-table-column prop="id" label="ID" width="60"></el-table-column>
+    <el-table-column prop="name" label="Name"></el-table-column>
+    <el-table-column label="Country" width="150">
+      <template #default="{ row }">{{ countryName(row.country) }}</template>
+    </el-table-column>
+    <el-table-column prop="lang" label="Language" width="100"></el-table-column>
+    <el-table-column prop="timezone" label="Timezone"></el-table-column>
+    <el-table-column label="CPU" width="70">
+      <template #default="{ row }">{{ row.cpu === 'auto' ? 'Auto' : row.cpu }}</template>
+    </el-table-column>
+    <el-table-column label="Run" width="100">
+      <template #default="{ row }">
+        <el-button v-if="!running.includes(row.id)" type="success" size="small" @click="launch(row.id)">Start</el-button>
+        <el-button v-else type="warning" size="small" @click="stop(row.id)">Stop</el-button>
+      </template>
+    </el-table-column>
+    <el-table-column label="Actions" width="150">
+      <template #default="{ row }">
+        <el-button size="small" :disabled="running.includes(row.id)" @click="openEdit(row)">Edit</el-button>
+        <el-button size="small" type="danger" @click="remove(row)">Delete</el-button>
+      </template>
+    </el-table-column>
+  </el-table>
+
+  <el-dialog v-model="dlg.show" :title="dlg.mode === 'create' ? 'Create containers' : 'Edit container'" width="620px" top="3vh">
+    <el-form :model="form" label-width="130px">
+      <el-form-item :label="dlg.mode === 'create' ? 'Name prefix' : 'Name'">
+        <el-input v-model="form.name" placeholder="Browser"></el-input>
+      </el-form-item>
+      <el-form-item v-if="dlg.mode === 'create'" label="Count">
+        <el-input-number v-model="dlg.count" :min="1" :max="50"></el-input-number>
+      </el-form-item>
+      <el-form-item label="Country preset">
+        <el-select v-model="form.country" filterable style="width:100%" @change="onCountry">
+          <el-option label="Custom" value="custom"></el-option>
+          <el-option v-for="c in COUNTRIES" :key="c[0]" :label="c[1] + '  ' + c[2] + '  ' + c[3]" :value="c[0]"></el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="Language">
+        <el-select v-model="form.lang" filterable allow-create default-first-option style="width:100%" @change="form.country = 'custom'">
+          <el-option v-for="l in LANGS" :key="l" :label="langLabel(l)" :value="l"></el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="Interface language">
+        <el-radio-group v-model="form.uiLang">
+          <el-radio-button value="en-US">en-US</el-radio-button>
+          <el-radio-button value="country">Follow country</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item label="Timezone">
+        <el-select v-model="form.timezone" filterable style="width:100%" @change="form.country = 'custom'">
+          <el-option v-for="t in TZ" :key="t" :label="t" :value="t"></el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="CPU cores">
+        <el-select v-model="form.cpu">
+          <el-option label="Auto" value="auto"></el-option>
+          <el-option v-for="c in [2,4,6,8,10,12,14,16]" :key="c" :label="c" :value="c"></el-option>
+        </el-select>
+      </el-form-item>
+      <el-form-item label="WebGL GPU">
+        <el-radio-group v-model="form.gpu">
+          <el-radio-button value="auto">Auto</el-radio-button>
+          <el-radio-button value="off">Off</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item label="Geolocation">
+        <el-radio-group v-model="form.geo">
+          <el-radio-button value="deny">Block</el-radio-button>
+          <el-radio-button value="ask">Ask</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item label="Do Not Track">
+        <el-switch v-model="form.dnt"></el-switch>
+      </el-form-item>
+      <el-form-item label="Proxy">
+        <el-input v-model="form.proxy" placeholder="http://host:port or socks5://host:port"></el-input>
+      </el-form-item>
+      <el-form-item label="WebRTC">
+        <el-checkbox v-model="form.webrtcProxy">Proxy-only UDP</el-checkbox>
+      </el-form-item>
+      <el-form-item label="Homepage">
+        <el-input v-model="form.homepage" placeholder="Optional"></el-input>
+      </el-form-item>
+      <el-form-item label="Disable">
+        <el-checkbox v-model="form.voicesOff">Speech voices</el-checkbox>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="dlg.show = false">Cancel</el-button>
+      <el-button type="primary" @click="save">OK</el-button>
+    </template>
+  </el-dialog>
+</div>
+
+<script src="./node_modules/vue/dist/vue.global.prod.js"></script>
+<script src="./node_modules/element-plus/dist/index.full.min.js"></script>
+<script>
+  const { createApp, ref, reactive, onMounted } = Vue
+
+  const COUNTRIES = [
+    ['US', 'United States', 'en-US', 'America/New_York'], ['CA', 'Canada', 'en-CA', 'America/Toronto'],
+    ['GB', 'United Kingdom', 'en-GB', 'Europe/London'], ['IE', 'Ireland', 'en-IE', 'Europe/Dublin'],
+    ['AU', 'Australia', 'en-AU', 'Australia/Sydney'], ['NZ', 'New Zealand', 'en-NZ', 'Pacific/Auckland'],
+    ['ZA', 'South Africa', 'en-ZA', 'Africa/Johannesburg'], ['NG', 'Nigeria', 'en-NG', 'Africa/Lagos'],
+    ['KE', 'Kenya', 'en-KE', 'Africa/Nairobi'], ['IN', 'India', 'en-IN', 'Asia/Kolkata'],
+    ['SG', 'Singapore', 'en-SG', 'Asia/Singapore'], ['PH', 'Philippines', 'en-PH', 'Asia/Manila'],
+    ['DE', 'Germany', 'de-DE', 'Europe/Berlin'], ['AT', 'Austria', 'de-AT', 'Europe/Vienna'],
+    ['CH', 'Switzerland', 'de-CH', 'Europe/Zurich'], ['FR', 'France', 'fr-FR', 'Europe/Paris'],
+    ['BE', 'Belgium', 'nl-BE', 'Europe/Brussels'], ['NL', 'Netherlands', 'nl-NL', 'Europe/Amsterdam'],
+    ['ES', 'Spain', 'es-ES', 'Europe/Madrid'], ['PT', 'Portugal', 'pt-PT', 'Europe/Lisbon'],
+    ['IT', 'Italy', 'it-IT', 'Europe/Rome'], ['SE', 'Sweden', 'sv-SE', 'Europe/Stockholm'],
+    ['NO', 'Norway', 'nb-NO', 'Europe/Oslo'], ['DK', 'Denmark', 'da-DK', 'Europe/Copenhagen'],
+    ['FI', 'Finland', 'fi-FI', 'Europe/Helsinki'], ['PL', 'Poland', 'pl-PL', 'Europe/Warsaw'],
+    ['CZ', 'Czechia', 'cs-CZ', 'Europe/Prague'], ['HU', 'Hungary', 'hu-HU', 'Europe/Budapest'],
+    ['RO', 'Romania', 'ro-RO', 'Europe/Bucharest'], ['GR', 'Greece', 'el-GR', 'Europe/Athens'],
+    ['TR', 'Turkey', 'tr-TR', 'Europe/Istanbul'], ['UA', 'Ukraine', 'uk-UA', 'Europe/Kyiv'],
+    ['RU', 'Russia', 'ru-RU', 'Europe/Moscow'], ['IL', 'Israel', 'he-IL', 'Asia/Jerusalem'],
+    ['SA', 'Saudi Arabia', 'ar-SA', 'Asia/Riyadh'], ['AE', 'United Arab Emirates', 'ar-AE', 'Asia/Dubai'],
+    ['EG', 'Egypt', 'ar-EG', 'Africa/Cairo'], ['PK', 'Pakistan', 'ur-PK', 'Asia/Karachi'],
+    ['BD', 'Bangladesh', 'bn-BD', 'Asia/Dhaka'], ['TH', 'Thailand', 'th-TH', 'Asia/Bangkok'],
+    ['VN', 'Vietnam', 'vi-VN', 'Asia/Ho_Chi_Minh'], ['ID', 'Indonesia', 'id-ID', 'Asia/Jakarta'],
+    ['MY', 'Malaysia', 'ms-MY', 'Asia/Kuala_Lumpur'], ['JP', 'Japan', 'ja-JP', 'Asia/Tokyo'],
+    ['KR', 'South Korea', 'ko-KR', 'Asia/Seoul'], ['TW', 'Taiwan', 'zh-TW', 'Asia/Taipei'],
+    ['HK', 'Hong Kong', 'zh-HK', 'Asia/Hong_Kong'], ['CN', 'China', 'zh-CN', 'Asia/Shanghai'],
+    ['MX', 'Mexico', 'es-MX', 'America/Mexico_City'], ['CO', 'Colombia', 'es-CO', 'America/Bogota'],
+    ['CR', 'Costa Rica', 'es-CR', 'America/Costa_Rica'], ['CL', 'Chile', 'es-CL', 'America/Santiago'],
+    ['AR', 'Argentina', 'es-AR', 'America/Argentina/Buenos_Aires'], ['BR', 'Brazil', 'pt-BR', 'America/Sao_Paulo'],
+  ]
+  const TZ = [...new Set([...Intl.supportedValuesOf('timeZone'), ...COUNTRIES.map((c) => c[3])])].sort()
+  const LANGS = [...new Set(COUNTRIES.map((c) => c[2]))].sort()
+  const dn = (() => { try { return new Intl.DisplayNames(['en'], { type: 'language' }) } catch { return null } })()
+  const langLabel = (c) => { try { return dn.of(c) + '  ' + c } catch { return c } }
+  const countryName = (code) => (COUNTRIES.find((c) => c[0] === code) || [0, 'Custom'])[1]
+
+  const blank = () => ({
+    name: '',
+    country: 'US', lang: 'en-US', uiLang: 'en-US', timezone: 'America/New_York',
+    cpu: 'auto', gpu: 'auto',
+    geo: 'deny', dnt: false, voicesOff: true,
+    webrtcProxy: false, proxy: '', homepage: '',
+  })
+  const clone = (o) => JSON.parse(JSON.stringify(o))
+
+  createApp({
+    setup() {
+      const envs = ref([]), running = ref([]), kernel = ref(true)
+      const form = reactive(blank())
+      const dlg = reactive({ show: false, mode: 'create', count: 1 })
+
+      const refresh = async () => {
+        const r = await api.list()
+        envs.value = r.envs; running.value = r.running; kernel.value = r.kernel
+      }
+      onMounted(() => {
+        refresh()
+        api.onState((ids) => (running.value = ids))
+        api.onNotice((msg) => ElementPlus.ElMessage.warning({ message: msg, duration: 6000 }))
+      })
+
+      const onCountry = (code) => {
+        const c = COUNTRIES.find((x) => x[0] === code)
+        if (c) { form.lang = c[2]; form.timezone = c[3] }
+      }
+      const openCreate = () => { Object.assign(form, blank()); dlg.mode = 'create'; dlg.count = 1; dlg.show = true }
+      const openEdit = (row) => { Object.assign(form, clone(row)); dlg.mode = 'edit'; dlg.show = true }
+      const save = async () => {
+        if (dlg.mode === 'create') await api.create(clone(form), dlg.count)
+        else await api.update(clone(form))
+        dlg.show = false
+        refresh()
+      }
+      const launch = async (id) => {
+        const r = await api.launch(id)
+        if (r && r.error) {
+          ElementPlus.ElMessage.error(r.error)
+          refresh()
+        }
+      }
+      const stop = (id) => api.stop(id)
+      const remove = async (row) => {
+        try {
+          await ElementPlus.ElMessageBox.confirm(`Delete ${row.name}? Its data will be deleted too.`, 'Confirm', { type: 'warning' })
+        } catch { return }
+        const loading = ElementPlus.ElLoading.service({ text: 'Deleting...', lock: true })
+        try {
+          const r = await api.remove(row.id)
+          if (r && r.error) ElementPlus.ElMessage.error({ message: r.error, duration: 8000 })
+        } finally { loading.close() }
+        refresh()
+      }
+      return {
+        envs, running, kernel, form, dlg, TZ, LANGS, COUNTRIES, langLabel, countryName,
+        onCountry, openCreate, openEdit, save, launch, stop, remove,
+      }
+    },
+  }).use(ElementPlus).mount('#app')
+</script>
+</body>
+</html>
