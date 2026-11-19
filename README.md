@@ -1,4 +1,6 @@
-# A lite fingerprint browser
+# lite
+A lite fingerprint browser
+
 Kernel: [fingerprint-chromium](https://github.com/adryfish/fingerprint-chromium) version 142.
 
 Framework: Electron.
