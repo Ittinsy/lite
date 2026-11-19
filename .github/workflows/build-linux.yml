@@ -22,9 +22,12 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Pack
-        run: tar -czf lite-linux-x64.tar.gz -C dist linux-unpacked
+        run: |
+          mv dist/linux-unpacked dist/lite
+          tar -cJf lite-linux-x64.tar.xz -C dist lite
 
       - uses: actions/upload-artifact@v4
         with:
           name: lite-linux-x64
-          path: lite-linux-x64.tar.gz
+          path: lite-linux-x64.tar.xz
+          compression-level: 0
