@@ -13,7 +13,7 @@ For Windows:
 npm install
 ```
 ```bash
-npm run dist:win
+npm run dist:win:dir
 ```
 
 For Linux:
